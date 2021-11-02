@@ -3,96 +3,82 @@ package main
 import (
 	"errors"
 	"fmt"
+	"github.com/White-AK111/snippetbox/pkg/models"
+	"github.com/jackc/pgtype"
 	"net/http"
 	"strconv"
-
-	"White-AK111/snippetbox/pkg/models"
+	"time"
 )
 
-// Обработчик главной страницы.
-// Меняем сигнатуры обработчика home, чтобы он определялся как метод.
-// структуры *application.
-func (app *application) home(w http.ResponseWriter, r *http.Request) {
-	// Проверяется, если текущий путь URL запроса точно совпадает с шаблоном "/". Если нет, вызывается
-	// функция http.NotFound() для возвращения клиенту ошибки 404.
+// home page handler
+func (a *app) home(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
-		app.notFound(w)
+		a.notFound(w)
 		return
 	}
 
-	// Получаем последние земетки из БД.
-	s, err := app.snippets.Latest()
+	// get latest snippet
+	s, err := a.snippets.LatestSnippets(1, 10)
 	if err != nil {
-		app.serverError(w, err)
+		a.serverError(w, err)
 		return
 	}
 
-	// Заполняем шаблон, отрисовываем страницу.
-	app.render(w, r, "home.page.tmpl", &templateData{
+	// fill template
+	a.render(w, r, "home.page.tmpl", &templateData{
 		Snippets: s,
 	})
 }
 
-// Обработчик для отображения содержимого заметки.
-func (app *application) showSnippet(w http.ResponseWriter, r *http.Request) {
-	// Извлекаем значение параметра id из URL и попытаемся
-	// конвертировать строку в integer используя функцию strconv.Atoi(). Если его нельзя
-	// конвертировать в integer, или значение меньше 1, возвращаем ответ
-	// 404 - страница не найдена!
+// showSnippet view snippet content
+func (a *app) showSnippet(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.URL.Query().Get("id"))
 	if err != nil || id < 1 {
-		app.notFound(w)
+		a.notFound(w)
 		return
 	}
 
-	// Вызываем метода Get из модели Snipping для извлечения данных для
-	// конкретной записи на основе её ID. Если подходящей записи не найдено,
-	// то возвращается ответ 404 Not Found (Страница не найдена).
-	s, err := app.snippets.Get(id)
+	s, err := a.snippets.GetSnippet(id, 1)
 	if err != nil {
 		if errors.Is(err, models.ErrNoRecord) {
-			app.notFound(w)
+			a.notFound(w)
 		} else {
-			app.serverError(w, err)
+			a.serverError(w, err)
 		}
 		return
 	}
 
-	// Заполняем шаблон, отрисовываем страницу.
-	app.render(w, r, "show.page.tmpl", &templateData{
+	// fill template
+	a.render(w, r, "show.page.tmpl", &templateData{
 		Snippet: s,
 	})
 }
 
-// Обработчик для создания новой заметки.
-func (app *application) createSnippet(w http.ResponseWriter, r *http.Request) {
-	// Используем r.Method для проверки, использует ли запрос метод POST или нет.
-	// http.MethodPost является строкой и содержит текст "POST".
+// createSnippet create new snippet
+func (a *app) createSnippet(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		// Если это не так, то
-		// Используем метод Header().Set() для добавления заголовка 'Allow: POST' в
-		// карту HTTP-заголовков. Первый параметр - название заголовка, а
-		// второй параметр - значение заголовка.
 		w.Header().Set("Allow", http.MethodPost)
-		app.clientError(w, http.StatusMethodNotAllowed)
+		a.clientError(w, http.StatusMethodNotAllowed)
 		return
 	}
 
-	// Создаем несколько переменных, содержащих тестовые данные.
-	title := "История про улитку"
-	content := "Улитка выползла из раковины,\nвытянула рожки,\nи опять подобрала их."
-	expires := "7"
+	snippet := models.Snippet{
+		UserId:  1,
+		Title:   "AnySnippet",
+		Content: "Test test test ...",
+		Created: pgtype.Timestamptz{Time: time.Now()},
+		Expires: pgtype.Timestamptz{Time: time.Now().Local().Add(time.Hour * time.Duration(240))},
+		Changed: pgtype.Timestamptz{Time: time.Now()},
+		Deleted: false,
+	}
 
-	// Передаем данные в метод SnippetModel.Insert(), получая обратно
-	// ID только что созданной записи в базу данных.
-	id, err := app.snippets.Insert(title, content, expires)
+	id, err := a.snippets.InsertSnippet(&snippet)
 	if err != nil {
-		app.serverError(w, err)
+		a.serverError(w, err)
 		return
 	}
 
-	// Перенаправляем пользователя на соответствующую страницу заметки.
 	http.Redirect(w, r, fmt.Sprintf("/snippet?id=%d", id), http.StatusSeeOther)
 
-	w.Write([]byte("Форма для создания новой заметки..."))
+	w.Write([]byte("Create snippet form"))
 }
