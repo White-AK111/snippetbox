@@ -1,14 +1,13 @@
 package main
 
 import (
-	//"White-AK111/snippetbox/pkg/forms"
-	"White-AK111/snippetbox/pkg/models"
+	"github.com/White-AK111/snippetbox/pkg/models"
 	"html/template"
 	"path/filepath"
 	"time"
 )
 
-// Объект шаблона.
+// templateData template struct
 type templateData struct {
 	CurrentYear int
 	Flash       string
@@ -17,7 +16,7 @@ type templateData struct {
 	Snippets []*models.Snippet
 }
 
-// Функция преобразования даты в человекочитаемый формат.
+// humanDate modify dae format
 func humanDate(t time.Time) string {
 	return t.Format("02 Jan 2006 at 15:04")
 }
@@ -26,7 +25,7 @@ var functions = template.FuncMap{
 	"humanDate": humanDate,
 }
 
-// Функция формирует map шаблонов (кэш).
+// newTemplateCache init templates cache
 func newTemplateCache(dir string) (map[string]*template.Template, error) {
 
 	cache := map[string]*template.Template{}
@@ -58,6 +57,5 @@ func newTemplateCache(dir string) (map[string]*template.Template, error) {
 		cache[name] = ts
 	}
 
-	// Возвращаем map шаблонов.
 	return cache, nil
 }
