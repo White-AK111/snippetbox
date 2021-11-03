@@ -8,12 +8,12 @@ import (
 var ErrNoRecord = errors.New("models: no records found")
 
 type (
-	SnippetID      int
-	UserID         int
-	ChannelTypeID  int
-	UserChannelID  int
-	NotificationID int
-	LogID          int
+	SnippetID      uint
+	UserID         uint
+	ChannelTypeID  uint
+	UserChannelID  uint
+	NotificationID uint
+	LogID          uint
 )
 
 type (

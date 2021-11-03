@@ -10,3 +10,6 @@ server:
   postgresConnectTimeout: 1
   attackerDuration: 10
   attackerGoroutinesCount: 1000
+  attackerCountUserInDB: 1000
+  attackerPrefixUserInDB: "userLogin"
+  attackerLimitSelectCount: 100

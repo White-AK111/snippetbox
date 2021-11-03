@@ -52,7 +52,7 @@ func main() {
 	}
 	defer app.snippets.DB.Close()
 
-	connStr := cfg.Server.ServerAddress + ":" + strconv.Itoa(cfg.Server.ServerPort)
+	connStr := cfg.Server.ServerAddress + ":" + strconv.Itoa(int(cfg.Server.ServerPort))
 
 	// init server
 	srv := &http.Server{
@@ -79,8 +79,8 @@ func (a *app) initPgServer(cfg *config.Config) error {
 		log.Fatal(err)
 	}
 
-	cfgPg.MaxConns = cfg.Server.PostgresMaxConns
-	cfgPg.MinConns = cfg.Server.PostgresMinConns
+	cfgPg.MaxConns = int32(cfg.Server.PostgresMaxConns)
+	cfgPg.MinConns = int32(cfg.Server.PostgresMinConns)
 	cfgPg.HealthCheckPeriod = cfg.Server.PostgresHealthCheckPeriod * time.Minute
 	cfgPg.MaxConnLifetime = cfg.Server.PostgresMaxConnLifetime * time.Hour
 	cfgPg.MaxConnIdleTime = cfg.Server.PostgresMaxConnIdleTime * time.Minute
