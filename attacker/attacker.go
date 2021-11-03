@@ -7,12 +7,33 @@ import (
 	"github.com/White-AK111/snippetbox/pkg/models/postgres"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"log"
+	"math"
+	"math/rand"
 	"net"
 	"os"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
 )
+
+// workerPool struct for management goroutines
+type workerPool struct {
+	wg            sync.WaitGroup
+	resultChan    chan uint64
+	semaphoreChan chan struct{}
+	ctx           context.Context
+}
+
+// newWorkerPool method initialize new WorkerPool, return *workerPool
+func newWorkerPool(N uint) *workerPool {
+	return &workerPool{
+		wg:            sync.WaitGroup{},
+		resultChan:    make(chan uint64, N),
+		semaphoreChan: make(chan struct{}, N),
+		ctx:           context.Background(),
+	}
+}
 
 // app struct for web-application
 type appAttack struct {
@@ -23,15 +44,18 @@ type appAttack struct {
 
 // AttackResults struct for get result of attack
 type AttackResults struct {
+	MaxConn          uint32
+	MinConn          uint32
 	Duration         time.Duration
-	GoroutinesCount  int
+	GoroutinesCount  uint
 	QueriesPerformed uint64
+	QPS              uint64
 }
 
 func main() {
 	cfg, err := config.Init()
 	if err != nil {
-		log.Fatalf("Can't load configuration file: %s", err)
+		log.Fatalf("Can't load configuration file: %s\n", err)
 	}
 
 	// init logger
@@ -45,23 +69,14 @@ func main() {
 	}
 
 	if err = app.initPgServer(cfg); err != nil {
-		log.Fatalf("Can't connect to DB: %s", err)
+		log.Fatalf("Can't connect to DB: %s\n", err)
 	}
 	defer app.snippets.DB.Close()
 
-	//lastSnippets, err := app.snippets.LatestSnippets(1, 10)
-	//if err != nil {
-	//log.Fatalf("Error on func Latest: %s", err)
-	//}
+	wp := newWorkerPool(cfg.Server.AttackerGoroutinesCount)
 
-	//for _, snippet := range lastSnippets {
-	//	fmt.Println(*snippet)
-	//}
-
-	//testQ, err := app.snippets.GetUserByLogin("mike111")
-	//fmt.Println(testQ)
-
-	attackResults := app.attack(cfg)
+	// !!! fill data in DB by data.sql before use this function !!!
+	attackResults := app.attack(cfg, wp)
 	fmt.Printf("Result of attack: %+v\n", attackResults)
 }
 
@@ -74,8 +89,8 @@ func (a *appAttack) initPgServer(cfg *config.Config) error {
 		log.Fatal(err)
 	}
 
-	cfgPg.MaxConns = cfg.Server.PostgresMaxConns
-	cfgPg.MinConns = cfg.Server.PostgresMinConns
+	cfgPg.MaxConns = int32(cfg.Server.PostgresMaxConns)
+	cfgPg.MinConns = int32(cfg.Server.PostgresMinConns)
 	cfgPg.HealthCheckPeriod = cfg.Server.PostgresHealthCheckPeriod * time.Minute
 	cfgPg.MaxConnLifetime = cfg.Server.PostgresMaxConnLifetime * time.Hour
 	cfgPg.MaxConnIdleTime = cfg.Server.PostgresMaxConnIdleTime * time.Minute
@@ -96,42 +111,109 @@ func (a *appAttack) initPgServer(cfg *config.Config) error {
 	return nil
 }
 
-// attack method for attack postgres concurrently
-func (a *appAttack) attack(cfg *config.Config) AttackResults {
+// attack method for attack postgres
+func (a *appAttack) attack(cfg *config.Config, wp *workerPool) AttackResults {
 	var queries uint64
-	var wg sync.WaitGroup
-
-	attacker := func(stopAt time.Time) {
-		for {
-			_, err := a.snippets.GetUserByLogin("mike111")
-			if err != nil {
-				log.Printf("Error on GetUserByLogin attack: %s", err)
-			}
-
-			atomic.AddUint64(&queries, 1)
-
-			if time.Now().After(stopAt) {
-				return
-			}
-		}
-	}
 
 	startAt := time.Now()
 	stopAt := startAt.Add(cfg.Server.AttackerDuration * time.Second)
+	t := time.NewTimer(cfg.Server.AttackerDuration * time.Second)
 
-	for i := 0; i < cfg.Server.AttackerGoroutinesCount; i++ {
-		wg.Add(1)
-		go func() {
-			attacker(stopAt)
-			wg.Done()
-		}()
+	for {
+		select {
+		case <-wp.ctx.Done():
+			{
+				wp.wg.Wait()
+				return AttackResults{
+					MaxConn:          cfg.Server.PostgresMaxConns,
+					MinConn:          cfg.Server.PostgresMinConns,
+					Duration:         time.Now().Sub(startAt),
+					GoroutinesCount:  cfg.Server.AttackerGoroutinesCount,
+					QueriesPerformed: queries,
+					QPS:              uint64(math.Round(float64(queries) / float64(cfg.Server.AttackerDuration))),
+				}
+			}
+		case wp.semaphoreChan <- struct{}{}:
+			{
+				wp.wg.Add(1)
+				go attacker(cfg, "GetUserByLogin", stopAt, a, wp, &queries)
+			}
+		case wp.semaphoreChan <- struct{}{}:
+			{
+				wp.wg.Add(1)
+				go attacker(cfg, "LatestSnippets", stopAt, a, wp, &queries)
+			}
+		case wp.semaphoreChan <- struct{}{}:
+			{
+				wp.wg.Add(1)
+				go attacker(cfg, "GetNotSendedNotifications", stopAt, a, wp, &queries)
+			}
+		case <-t.C:
+			{
+				wp.wg.Wait()
+				return AttackResults{
+					MaxConn:          cfg.Server.PostgresMaxConns,
+					MinConn:          cfg.Server.PostgresMinConns,
+					Duration:         time.Now().Sub(startAt),
+					GoroutinesCount:  cfg.Server.AttackerGoroutinesCount,
+					QueriesPerformed: queries,
+					QPS:              uint64(math.Round(float64(queries) / float64(cfg.Server.AttackerDuration))),
+				}
+			}
+		default:
+			wp.wg.Wait()
+		}
 	}
+}
 
-	wg.Wait()
-
-	return AttackResults{
-		Duration:         time.Now().Sub(startAt),
-		GoroutinesCount:  cfg.Server.AttackerGoroutinesCount,
-		QueriesPerformed: queries,
+// attacker function for attack postgres concurrently
+func attacker(cfg *config.Config, query string, stopAt time.Time, a *appAttack, wp *workerPool, queries *uint64) {
+	defer wp.wg.Done()
+	for {
+		if time.Now().Before(stopAt) {
+			switch query {
+			case "GetUserByLogin":
+				{
+					prefix := cfg.Server.AttackerPrefixUserInDB
+					userId := getRandomInt(int(cfg.Server.AttackerCountUserInDB))
+					login := prefix + strconv.Itoa(userId)
+					_, err := a.snippets.GetUserByLogin(login)
+					if err != nil {
+						log.Printf("Error on GetUserByLogin attack: %s login: %s \n", err, login)
+					}
+					atomic.AddUint64(queries, 1)
+				}
+			case "LatestSnippets":
+				{
+					userId := getRandomInt(int(cfg.Server.AttackerCountUserInDB))
+					limit := getRandomInt(int(cfg.Server.AttackerLimitSelectCount))
+					_, err := a.snippets.LatestSnippets(uint(userId), uint(limit))
+					if err != nil {
+						log.Printf("Error on GetUserByLogin attack: %s login: %s limit: %s \n", err, userId, limit)
+					}
+					atomic.AddUint64(queries, 1)
+				}
+			case "GetNotSendedNotifications":
+				{
+					_, err := a.snippets.GetNotSendedNotifications()
+					if err != nil {
+						log.Printf("Error on GetNotSendedNotifications attack: %s \n", err)
+					}
+					atomic.AddUint64(queries, 1)
+				}
+			}
+		} else {
+			return
+		}
 	}
+}
+
+// getRandomInt get random int, where N = {1..N)
+func getRandomInt(n int) int {
+	rand.Seed(time.Now().UnixNano())
+	rInt := rand.Intn(n)
+	if rInt == 0 {
+		rInt++
+	}
+	return n
 }

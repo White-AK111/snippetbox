@@ -17,8 +17,8 @@ func (a *app) serverError(w http.ResponseWriter, err error) {
 }
 
 // clientError send error to client
-func (a *app) clientError(w http.ResponseWriter, status int) {
-	http.Error(w, http.StatusText(status), status)
+func (a *app) clientError(w http.ResponseWriter, status uint) {
+	http.Error(w, http.StatusText(int(status)), int(status))
 }
 
 // notFound for send 404
@@ -54,7 +54,7 @@ func (a *app) addDefaultData(td *templateData, r *http.Request) *templateData {
 		td = &templateData{}
 	}
 
-	td.CurrentYear = time.Now().Year()
+	td.CurrentYear = uint(time.Now().Year())
 	//td.Flash = app.session.PopString(r, "flash")
 	return td
 }

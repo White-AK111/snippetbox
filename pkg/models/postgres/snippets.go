@@ -40,7 +40,7 @@ returning id;
 }
 
 // GetSnippet get snippet by id
-func (a *SnippetModel) GetSnippet(id int, userId int) (*models.Snippet, error) {
+func (a *SnippetModel) GetSnippet(id uint, userId uint) (*models.Snippet, error) {
 	const sql = `
 SELECT id, user_id, title, content, created, expires, changed, deleted  
 FROM snippets 
@@ -65,7 +65,7 @@ AND deleted = FALSE;
 }
 
 // LatestSnippets get last user snippets
-func (a *SnippetModel) LatestSnippets(userId int, limit int) ([]*models.Snippet, error) {
+func (a *SnippetModel) LatestSnippets(userId uint, limit uint) ([]*models.Snippet, error) {
 	const sql = `
 SELECT id, user_id, title, content, created, expires, changed, deleted  
 FROM snippets 
