@@ -8,51 +8,47 @@ import (
 	"time"
 )
 
-// Помощник serverError записывает сообщение об ошибке в errorLog и
-// затем отправляет пользователю ответ 500 "Внутренняя ошибка сервера".
-func (app *application) serverError(w http.ResponseWriter, err error) {
+// serverError write error to errorLog
+func (a *app) serverError(w http.ResponseWriter, err error) {
 	trace := fmt.Sprintf("%s\n%s", err.Error(), debug.Stack())
-	app.errorLog.Output(2, trace)
+	a.errorLog.Output(2, trace)
 
 	http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 }
 
-// Помощник clientError отправляет определенный код состояния и соответствующее описание
-// пользователю. Мы будем использовать это в следующий уроках, чтобы отправлять ответы вроде 400 "Bad
-// Request", когда есть проблема с пользовательским запросом.
-func (app *application) clientError(w http.ResponseWriter, status int) {
+// clientError send error to client
+func (a *app) clientError(w http.ResponseWriter, status int) {
 	http.Error(w, http.StatusText(status), status)
 }
 
-// Помощник notFound. Это просто
-// удобная оболочка вокруг clientError, которая отправляет пользователю ответ "404 Страница не найдена".
-func (app *application) notFound(w http.ResponseWriter) {
-	app.clientError(w, http.StatusNotFound)
+// notFound for send 404
+func (a *app) notFound(w http.ResponseWriter) {
+	a.clientError(w, http.StatusNotFound)
 }
 
-// Обработка (рендер) шаблона, возврат обработанного шаблона в ответ на запрос.
-func (app *application) render(w http.ResponseWriter, r *http.Request, name string, td *templateData) {
+// render template
+func (a *app) render(w http.ResponseWriter, r *http.Request, name string, td *templateData) {
 
-	ts, ok := app.templateCache[name]
+	ts, ok := a.templateCache[name]
 
 	if !ok {
-		app.serverError(w, fmt.Errorf("Шаблон %s не существует!", name))
+		a.serverError(w, fmt.Errorf("template %s not exist", name))
 		return
 	}
 
 	buf := new(bytes.Buffer)
 
-	err := ts.Execute(buf, app.addDefaultData(td, r))
+	err := ts.Execute(buf, a.addDefaultData(td, r))
 	if err != nil {
-		app.serverError(w, err)
+		a.serverError(w, err)
 		return
 	}
 
 	buf.WriteTo(w)
 }
 
-// Функция добавления данных по умолчнию в шаблон.
-func (app *application) addDefaultData(td *templateData, r *http.Request) *templateData {
+// addDefaultData add default data into template
+func (a *app) addDefaultData(td *templateData, r *http.Request) *templateData {
 
 	if td == nil {
 		td = &templateData{}

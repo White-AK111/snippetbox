@@ -1,0 +1,12 @@
+server:
+  serverAddress: "localhost"
+  serverPort: 4000
+  dsn: "postgres://postgres:P@ssw0rd@localhost:5432/snippetbox"
+  postgresMaxConns: 8
+  postgresMinConns: 4
+  postgresHealthCheckPeriod: 1
+  postgresMaxConnLifetime: 24
+  postgresMaxConnIdleTime: 30
+  postgresConnectTimeout: 1
+  attackerDuration: 10
+  attackerGoroutinesCount: 1000
