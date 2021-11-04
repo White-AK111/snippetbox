@@ -4,7 +4,7 @@ import (
 	"net/http"
 )
 
-func (a *app) routes() *http.ServeMux {
+func (a *app) routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", a.home)
 	mux.HandleFunc("/snippet", a.showSnippet)
@@ -14,7 +14,10 @@ func (a *app) routes() *http.ServeMux {
 	mux.Handle("/static", http.NotFoundHandler())
 	mux.Handle("/static/", http.StripPrefix("/static", fileServer))
 
-	return mux
+	handler := Logging(mux)
+	handler = PanicRecovery(handler)
+
+	return handler
 }
 
 // neuteredFileSystem for custom file system

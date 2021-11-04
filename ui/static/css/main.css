@@ -267,14 +267,6 @@ button:hover {
     display: inline-block;
 }
 
-.snippet .metadata time:first-child {
-    float: left;
-}
-
-.snippet .metadata time:last-child {
-    float: right;
-}
-
 div.flash {
     color: #FFFFFF;
     font-weight: bold;
