@@ -11,8 +11,12 @@
         </div>
         <pre><code>{{.Content}}</code></pre>
         <div class='metadata'>
-            <time class="utcDate">Created: {{.Created}}</time>
-            <time class="utcDate">Expires: {{.Expires}}</time>
+            <strong>Создана: </strong>
+            <time class="utcDate">{{.Created}}</time>
+        </div>
+        <div class='metadata'>
+            <strong>Истекает: </strong>
+            <time class="utcDate">{{.Expires}}</time>
         </div>
     </div>
     {{end}}

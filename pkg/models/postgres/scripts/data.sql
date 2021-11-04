@@ -1022,6 +1022,22 @@ SELECT id, 'Snippet mike', 'Go to work', current_timestamp, current_timestamp + 
 FROM users 
 WHERE login = 'mike111'
 UNION ALL
+SELECT id, 'Second snippet', 'Go to home', current_timestamp, current_timestamp + interval '5 day', current_timestamp, false
+FROM users
+WHERE login = 'mike111'
+UNION ALL
+SELECT id, 'Job', 'Find a job', current_timestamp, current_timestamp + interval '30 day', current_timestamp, false
+FROM users
+WHERE login = 'mike111'
+UNION ALL
+SELECT id, 'Buy', 'Buy a cocaine', current_timestamp, current_timestamp + interval '7 day', current_timestamp, false
+FROM users
+WHERE login = 'mike111'
+UNION ALL
+SELECT id, 'Rent', 'Pay for rent', current_timestamp, current_timestamp + interval '14 day', current_timestamp, false
+FROM users
+WHERE login = 'mike111'
+UNION ALL
 SELECT id, 'Snippet sergey', 'Go to home', current_timestamp, '2021-10-30 10:00:00', current_timestamp, false 
 FROM users 
 WHERE login = 'ssphak'
