@@ -39,6 +39,29 @@ returning id;
 	return id, nil
 }
 
+// InsertUser insert user into DB
+func (a *SnippetModel) InsertUser(user *models.User) (models.UserID, error) {
+	const sql = `
+INSERT into users (name, login, email, hashed_password, created, confirmed) VALUES 
+($1, $2, $3, $4, $5, $6)
+returning id;
+`
+	var id models.UserID
+	err := a.DB.QueryRow(a.CTX, sql,
+		user.Name,
+		user.Login,
+		user.Email,
+		user.HashedPassword,
+		user.Created,
+		user.Confirmed,
+	).Scan(&id)
+	if err != nil {
+		return 0, fmt.Errorf("failed to insert user: %w", err)
+	}
+
+	return id, nil
+}
+
 // GetSnippet get snippet by id
 func (a *SnippetModel) GetSnippet(id uint, userId uint) (*models.Snippet, error) {
 	const sql = `

@@ -1,73 +1,114 @@
+//go:build integration
+// +build integration
+
 package postgres
 
 import (
-	"database/sql"
-	"github.com/ory/dockertest/v3"
-	"github.com/ory/dockertest/v3/docker"
+	"context"
+	"github.com/White-AK111/snippetbox/config"
+	"github.com/White-AK111/snippetbox/pkg/models"
+	"github.com/jackc/pgtype"
+	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/stretchr/testify/require"
 	"log"
-	"os"
+	"net"
 	"testing"
 	"time"
 )
 
-var db *sql.DB
-
-func TestMain(m *testing.M) {
-	// uses a sensible default on windows (tcp/http) and linux/osx (socket)
-	pool, err := dockertest.NewPool("")
-	if err != nil {
-		log.Fatalf("Could not connect to docker: %s", err)
-	}
-
-	// pulls an image, creates a container based on it and runs it
-	resource, err := pool.RunWithOptions(&dockertest.RunOptions{
-		Repository: "postgres",
-		Tag:        "14.0",
-		Env: []string{
-			"POSTGRES_PASSWORD=P@ssw0rd",
-			"POSTGRES_USER=postgres",
-			"POSTGRES_DB=snippetbox",
-			"listen_addresses = '*'",
-		},
-	}, func(config *docker.HostConfig) {
-		// set AutoRemove to true so that stopped container goes away by itself
-		config.AutoRemove = true
-		config.RestartPolicy = docker.RestartPolicy{Name: "no"}
-	})
-	if err != nil {
-		log.Fatalf("Could not start resource: %s", err)
-	}
-
-	//hostAndPort := resource.GetHostPort("5432/tcp")
-	//databaseUrl := fmt.Sprintf("postgres://postgres:P@ssw0rd@%s/snippetbox?sslmode=disable", hostAndPort)
-	databaseUrl := "postgres://postgres:P@ssw0rd@localhost:5432/snippetbox"
-
-	log.Println("Connecting to database on url: ", databaseUrl)
-
-	resource.Expire(120) // Tell docker to hard kill the container in 120 seconds
-
-	// exponential backoff-retry, because the application in the container might not be ready to accept connections yet
-	pool.MaxWait = 120 * time.Second
-	if err = pool.Retry(func() error {
-		db, err = sql.Open("postgres", databaseUrl)
-		if err != nil {
-			return err
-		}
-		return db.Ping()
-	}); err != nil {
-		log.Fatalf("Could not connect to docker: %s", err)
-	}
-	//Run tests
-	code := m.Run()
-
-	// You can't defer this because os.Exit doesn't care for defer
-	if err := pool.Purge(resource); err != nil {
-		log.Fatalf("Could not purge resource: %s", err)
-	}
-
-	os.Exit(code)
+// app struct for test
+type app struct {
+	snippets *SnippetModel
 }
 
-func TestRealbob(t *testing.T) {
-	// all tests
+var appTest = &app{}
+
+// TestIntegrationConnectionToPG test connect to DB
+func TestIntegrationConnectionToPG(t *testing.T) {
+	// init config
+	cfg, err := config.Init()
+	if err != nil {
+		log.Fatalf("Can't load configuration file: %s\n", err)
+	}
+
+	if err = appTest.initPgServer(cfg); err != nil {
+		log.Fatalf("Can't connect to DB: %s", err)
+	}
+}
+
+// initPgServer method init connections to postgres
+func (a *app) initPgServer(cfg *config.Config) error {
+	ctx := context.Background()
+
+	cfgPg, err := pgxpool.ParseConfig(cfg.Server.DSN)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	cfgPg.MaxConns = int32(cfg.Server.PostgresMaxConns)
+	cfgPg.MinConns = int32(cfg.Server.PostgresMinConns)
+	cfgPg.HealthCheckPeriod = cfg.Server.PostgresHealthCheckPeriod * time.Minute
+	cfgPg.MaxConnLifetime = cfg.Server.PostgresMaxConnLifetime * time.Hour
+	cfgPg.MaxConnIdleTime = cfg.Server.PostgresMaxConnIdleTime * time.Minute
+	cfgPg.ConnConfig.ConnectTimeout = cfg.Server.PostgresConnectTimeout * time.Second
+
+	cfgPg.ConnConfig.DialFunc = (&net.Dialer{
+		KeepAlive: cfgPg.HealthCheckPeriod,
+		Timeout:   cfgPg.ConnConfig.ConnectTimeout,
+	}).DialContext
+
+	dbPool, err := pgxpool.ConnectConfig(ctx, cfgPg)
+	if err != nil {
+		return err
+	}
+
+	a.snippets = &SnippetModel{DB: dbPool, CTX: ctx}
+
+	return nil
+}
+
+// TestIntegrationGetUserByLogin test queries InsertUser and GetUserByLogin
+func TestIntegrationGetUserByLogin(t *testing.T) {
+	defer appTest.snippets.DB.Close()
+
+	tests := []struct {
+		name    string
+		app     *app
+		ctx     context.Context
+		login   string
+		prepare func(*testing.T)
+		check   func(*testing.T, *models.User, error)
+	}{
+		{
+			name:  "success",
+			app:   appTest,
+			ctx:   context.Background(),
+			login: "TestUser100500",
+			prepare: func(t *testing.T) {
+				user := models.User{
+					Name:           "TestUser100500",
+					Login:          "TestUser100500",
+					Email:          "TestUser100500@email.com",
+					HashedPassword: pgtype.Bytea{Bytes: []byte("P@ssw0rd"), Status: pgtype.Present},
+					Created:        pgtype.Timestamptz{Time: time.Now(), Status: pgtype.Present},
+					Confirmed:      true,
+				}
+				_, err := appTest.snippets.InsertUser(&user)
+				require.NoError(t, err)
+			},
+			check: func(t *testing.T, user *models.User, err error) {
+				require.NoError(t, err)
+				require.NotEmpty(t, *user)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			tt.prepare(t)
+			user, err := tt.app.snippets.GetUserByLogin(tt.login)
+			tt.check(t, user, err)
+		})
+	}
 }

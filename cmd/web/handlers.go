@@ -66,9 +66,9 @@ func (a *app) createSnippet(w http.ResponseWriter, r *http.Request) {
 		UserId:  1,
 		Title:   "AnySnippet",
 		Content: "Test test test ...",
-		Created: pgtype.Timestamptz{Time: time.Now()},
-		Expires: pgtype.Timestamptz{Time: time.Now().Local().Add(time.Hour * time.Duration(240))},
-		Changed: pgtype.Timestamptz{Time: time.Now()},
+		Created: pgtype.Timestamptz{Time: time.Now(), Status: pgtype.Present},
+		Expires: pgtype.Timestamptz{Time: time.Now().Local().Add(time.Hour * time.Duration(240)), Status: pgtype.Present},
+		Changed: pgtype.Timestamptz{Time: time.Now(), Status: pgtype.Present},
 		Deleted: false,
 	}
 
