@@ -25,19 +25,19 @@ type app struct {
 }
 
 func main() {
-	cfg, err := config.Init()
-	if err != nil {
-		log.Fatalf("Can't load configuration file: %s", err)
-	}
-
 	// init logger
 	infoLog := log.New(os.Stdout, "INFO\t", log.Ldate|log.Ltime)
 	errorLog := log.New(os.Stderr, "ERROR\t", log.Ldate|log.Ltime|log.Lshortfile)
 
+	cfg, err := config.Init()
+	if err != nil {
+		errorLog.Fatalf("Can't load configuration file: %s", err)
+	}
+
 	// init templates cache
 	templateCache, err := newTemplateCache("../../ui/html/")
 	if err != nil {
-		log.Fatalf("Can't init templates cache: %s", err)
+		errorLog.Fatalf("Can't init templates cache: %s", err)
 	}
 
 	// init app
@@ -48,7 +48,7 @@ func main() {
 	}
 
 	if err = app.initPgServer(cfg); err != nil {
-		log.Fatalf("Can't connect to DB: %s", err)
+		errorLog.Fatalf("Can't connect to DB: %s", err)
 	}
 	defer app.snippets.DB.Close()
 
@@ -76,7 +76,7 @@ func (a *app) initPgServer(cfg *config.Config) error {
 
 	cfgPg, err := pgxpool.ParseConfig(cfg.Server.DSN)
 	if err != nil {
-		log.Fatal(err)
+		a.errorLog.Fatal(err)
 	}
 
 	cfgPg.MaxConns = int32(cfg.Server.PostgresMaxConns)

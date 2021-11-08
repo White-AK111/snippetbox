@@ -15,7 +15,6 @@ docker run \
     -e PGDATA=/var/lib/postgresql/data \
     -v $HOME/pg-for-go-devs/data:/var/lib/postgresql/data \
     -v $HOME/pg-for-go-devs/init:/docker-entrypoint-initdb.d \
-    --user $(id -u):$(id -g) \
     postgres:14.0
 ```
 
@@ -31,7 +30,7 @@ docker start postgres
 
 ### Connect to DB psql
 ```bash
-psql -h 127.0.0.1 -p 5432 -U postgres -d snippetbox
+psql -h 127.0.0.1 -p 5432 -U snippetbox -d snippetbox
 ```
 
 ### Run command in container
@@ -47,7 +46,7 @@ docker exec \
 ```bash
 cd docker-entrypoint-initdb.d
 
-psql -h 127.0.0.1 -p 5432 -U postgres -d snippetbox
+psql -h 127.0.0.1 -p 5432 -U snippetbox -d snippetbox
 
 \i schema.sql
 \i data.sql

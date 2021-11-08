@@ -1,7 +1,7 @@
 server:
   serverAddress: "localhost"
   serverPort: 4000
-  dsn: "postgres://postgres:P@ssw0rd@localhost:5432/snippetbox"
+  dsn: "postgres://snippetbox:P@ssw0rd@localhost:5432/snippetbox"
   postgresMaxConns: 8
   postgresMinConns: 4
   postgresHealthCheckPeriod: 1
