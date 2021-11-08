@@ -14,8 +14,8 @@ func (a *app) routes() http.Handler {
 	mux.Handle("/static", http.NotFoundHandler())
 	mux.Handle("/static/", http.StripPrefix("/static", fileServer))
 
-	handler := Logging(mux)
-	handler = PanicRecovery(handler)
+	handler := a.Logging(mux)
+	handler = a.PanicRecovery(handler)
 
 	return handler
 }

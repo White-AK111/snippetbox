@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"github.com/White-AK111/snippetbox/config"
 	"github.com/White-AK111/snippetbox/pkg/models/postgres"
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -53,14 +52,14 @@ type AttackResults struct {
 }
 
 func main() {
-	cfg, err := config.Init()
-	if err != nil {
-		log.Fatalf("Can't load configuration file: %s\n", err)
-	}
-
 	// init logger
 	infoLog := log.New(os.Stdout, "INFO\t", log.Ldate|log.Ltime)
 	errorLog := log.New(os.Stderr, "ERROR\t", log.Ldate|log.Ltime|log.Lshortfile)
+
+	cfg, err := config.Init()
+	if err != nil {
+		errorLog.Fatalf("Can't load configuration file: %s\n", err)
+	}
 
 	// init app
 	app := &appAttack{
@@ -69,7 +68,7 @@ func main() {
 	}
 
 	if err = app.initPgServer(cfg); err != nil {
-		log.Fatalf("Can't connect to DB: %s\n", err)
+		errorLog.Fatalf("Can't connect to DB: %s\n", err)
 	}
 	defer app.snippets.DB.Close()
 
@@ -77,7 +76,7 @@ func main() {
 
 	// !!! fill data in DB by data.sql before use this function !!!
 	attackResults := app.attack(cfg, wp)
-	fmt.Printf("Result of attack: %+v\n", attackResults)
+	infoLog.Printf("Result of attack: %+v\n", attackResults)
 }
 
 // initPgServer method init connections to postgres
@@ -86,7 +85,7 @@ func (a *appAttack) initPgServer(cfg *config.Config) error {
 
 	cfgPg, err := pgxpool.ParseConfig(cfg.Server.DSN)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	cfgPg.MaxConns = int32(cfg.Server.PostgresMaxConns)
@@ -179,7 +178,7 @@ func attacker(cfg *config.Config, query string, stopAt time.Time, a *appAttack, 
 					login := prefix + strconv.Itoa(userId)
 					_, err := a.snippets.GetUserByLogin(login)
 					if err != nil {
-						log.Printf("Error on GetUserByLogin attack: %s login: %s \n", err, login)
+						a.errorLog.Printf("Error on GetUserByLogin attack: %s login: %s \n", err, login)
 					}
 					atomic.AddUint64(queries, 1)
 				}
@@ -197,7 +196,7 @@ func attacker(cfg *config.Config, query string, stopAt time.Time, a *appAttack, 
 				{
 					_, err := a.snippets.GetNotSendedNotifications()
 					if err != nil {
-						log.Printf("Error on GetNotSendedNotifications attack: %s \n", err)
+						a.errorLog.Printf("Error on GetNotSendedNotifications attack: %s \n", err)
 					}
 					atomic.AddUint64(queries, 1)
 				}

@@ -29,7 +29,7 @@ type Config struct {
 // Init function for initialize Config structure
 func Init() (*Config, error) {
 	var cfg = Config{}
-	err := fig.Load(&cfg, fig.Dirs("../../config/", "../config/"), fig.File("config.yaml"))
+	err := fig.Load(&cfg, fig.Dirs("../../config/", "../config/", "../../../config/"), fig.File("config.yaml"))
 	if err != nil {
 		log.Fatalf("can't load configuration file: %s", err)
 		return nil, err
