@@ -51,3 +51,6 @@ psql -h 127.0.0.1 -p 5432 -U snippetbox -d snippetbox
 \i schema.sql
 \i data.sql
 ```
+
+### Start Redis
+docker-compose up -d

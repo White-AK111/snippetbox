@@ -4,15 +4,20 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
+
 	"github.com/White-AK111/snippetbox/pkg/models"
+
+	"github.com/go-redis/cache/v8"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 )
 
 // SnippetModel - struct for pool connections sql.DB
 type SnippetModel struct {
-	DB  *pgxpool.Pool
-	CTX context.Context
+	DB    *pgxpool.Pool
+	CTX   context.Context
+	Cache *cache.Cache
 }
 
 // InsertSnippet insert snippet into DB
@@ -35,6 +40,20 @@ returning id;
 	if err != nil {
 		return 0, fmt.Errorf("failed to insert snippet: %w", err)
 	}
+
+	key := string(id) + "#" + string(snippet.UserId)
+
+	err = a.Cache.Set(&cache.Item{
+		Ctx:   a.CTX,
+		Key:   key,
+		Value: snippet,
+		TTL:   time.Hour,
+	})
+
+	if err != nil {
+		return 0, fmt.Errorf("failed to insert snippet: %w", err)
+	}
+	fmt.Printf("INFO\tStore in cache\n")
 
 	return id, nil
 }
@@ -64,7 +83,18 @@ returning id;
 
 // GetSnippet get snippet by id
 func (a *SnippetModel) GetSnippet(id uint, userId uint) (*models.Snippet, error) {
-	const sql = `
+
+	snippet := &models.Snippet{}
+
+	key := string(id) + "#" + string(userId)
+	err := a.Cache.Get(a.CTX, key, snippet)
+
+	switch err {
+	case nil:
+		fmt.Printf("INFO\tGET from cache\n")
+		return snippet, nil
+	case cache.ErrCacheMiss:
+		const sql = `
 SELECT id, user_id, title, content, created, expires, changed, deleted  
 FROM snippets 
 WHERE id = $1 
@@ -72,19 +102,32 @@ AND user_id = $2
 AND expires > current_timestamp  
 AND deleted = FALSE;
 `
-	row := a.DB.QueryRow(a.CTX, sql, id, userId)
-	snippet := &models.Snippet{}
+		row := a.DB.QueryRow(a.CTX, sql, id, userId)
+		err = row.Scan(&snippet.Id, &snippet.UserId, &snippet.Title, &snippet.Content, &snippet.Created, &snippet.Expires, &snippet.Changed, &snippet.Deleted)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return nil, models.ErrNoRecord
+			} else {
+				return nil, err
+			}
+		}
 
-	err := row.Scan(&snippet.Id, &snippet.UserId, &snippet.Title, &snippet.Content, &snippet.Created, &snippet.Expires, &snippet.Changed, &snippet.Deleted)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, models.ErrNoRecord
-		} else {
+		err = a.Cache.Set(&cache.Item{
+			Ctx:   a.CTX,
+			Key:   key,
+			Value: snippet,
+			TTL:   time.Hour,
+		})
+
+		if err != nil {
 			return nil, err
 		}
-	}
 
-	return snippet, nil
+		fmt.Printf("INFO\tGET from DB\n")
+		return snippet, nil
+	default:
+		return nil, err
+	}
 }
 
 // LatestSnippets get last user snippets
