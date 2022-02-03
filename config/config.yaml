@@ -13,3 +13,7 @@ server:
   attackerCountUserInDB: 1000
   attackerPrefixUserInDB: "userLogin"
   attackerLimitSelectCount: 100
+  redisAddress: "localhost:6379"
+  redisPassword: ""
+  redisDB: 0
+  redisLFU: 720

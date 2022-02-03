@@ -4,6 +4,8 @@ import (
 	"context"
 	"github.com/White-AK111/snippetbox/config"
 	"github.com/White-AK111/snippetbox/pkg/models/postgres"
+	"github.com/go-redis/cache/v8"
+	"github.com/go-redis/redis/v8"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"html/template"
 	"log"
@@ -96,7 +98,22 @@ func (a *app) initPgServer(cfg *config.Config) error {
 		return err
 	}
 
-	a.snippets = &postgres.SnippetModel{DB: dbPool, CTX: ctx}
+	rdb := redis.NewClient(&redis.Options{
+		Addr:     cfg.Server.RedisAddress,
+		Password: cfg.Server.RedisPassword,
+		DB:       cfg.Server.RedisDB,
+	})
+
+	rCache := cache.New(&cache.Options{
+		Redis:      rdb,
+		LocalCache: cache.NewTinyLFU(cfg.Server.RedisLFU, time.Minute),
+	})
+
+	a.snippets = &postgres.SnippetModel{
+		DB:    dbPool,
+		CTX:   ctx,
+		Cache: rCache,
+	}
 
 	return nil
 }

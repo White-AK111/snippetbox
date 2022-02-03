@@ -23,6 +23,10 @@ type Config struct {
 		AttackerCountUserInDB     uint          `fig:"attackerCountUserInDB" default:"1000"`                                 // count of test users in DB for attacker
 		AttackerPrefixUserInDB    string        `fig:"attackerPrefixUserInDB" default:"userLogin"`                           // prefix of test users in DB for attacker
 		AttackerLimitSelectCount  uint          `fig:"attackerLimitSelectCount" default:"100"`                               // count of LIMIT in SELECT query's in DB for attacker
+		RedisAddress              string        `fig:"redisAddress" default:"localhost:6379"`                                // address Redis instance
+		RedisPassword             string        `fig:"redisPassword" default:""`                                             // password Redis instance
+		RedisDB                   int           `fig:"redisDB" default:"0"`                                                  // Redis DB
+		RedisLFU                  int           `fig:"redisLFU" default:"720"`                                               // Redis LFU duration in minutes
 	} `fig:"server"`
 }
 
